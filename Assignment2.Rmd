@@ -1,0 +1,125 @@
+---
+title: "Assignment 2"
+author: "Anu"
+date: "May 12, 2017"
+output: html_document
+---
+
+```{r install packs, eval=TRUE, echo=TRUE, warning=FALSE}
+# For This assignment, Tibbles is put to use
+# Tibbles are data frames (able to handle old concepts and data frames , ancient times in computing) Tibble package is part of core tidyverse
+
+# For running the R code successfully , install Tidyverse,tibble, dplyr (slice, filter of data etc). Load the library tidyverse, dplyr
+
+#install.packages("tidyverse")
+#install.packages("tibble")
+#nstall.packages("dplyr")
+#ibrary(tidyverse)
+
+```
+
+```{r CA Gazetteer, eval=TRUE, echo=TRUE, warning=FALSE}
+############# Data Import and The Tibble Art of Tidying #############
+
+# Reading data from file clim.txt into vector Climatedata
+# And View the data in the table format
+# The data text file has a | delimiter and has missing value. Both taken care of while importing data into data frame below
+
+mydata <- read.delim("~/Anurooba/UCSB/BREN/3 Spring 2017/262/Assignment/Assignment 2/CA_Features_20170401.txt", sep = "|",na="")
+
+# Input the data frame into a tibble,in the raw form, no type conversion happens during creation of a tibble.
+library(tibble)
+library(dplyr)
+library(tidyverse)
+gaz_raw <- as_tibble(mydata)
+gaz_raw
+
+# Copy only the columns per assignment question into a gaz tibble.
+
+gaz <- gaz_raw[, c("FEATURE_ID", "FEATURE_NAME","FEATURE_CLASS","STATE_ALPHA", "COUNTY_NAME","PRIM_LAT_DEC","PRIM_LONG_DEC","SOURCE_LAT_DEC","SOURCE_LONG_DEC","ELEV_IN_M","MAP_NAME","DATE_CREATED","DATE_EDITED")]
+gaz
+
+
+# tibble has set following type for the columns chosen :
+# factor vector:    "FEATURE_NAME","FEATURE_CLASS","STATE_ALPHA","COUNTY_NAME","MAP_NAME",
+#                   "DATE_CREATED","DATE_EDITED"
+# double vector:    "PRIM_LAT_DEC","PRIM_LONG_DEC","SOURCE_LAT_DEC","SOURCE_LONG_DEC"
+# integer vector:   "ELEV_IN_M"
+#   
+# [1] Changing factor vector to character
+# 
+gaz$FEATURE_NAME <- parse_character(gaz$FEATURE_NAME)
+gaz$FEATURE_CLASS <- parse_character(gaz$FEATURE_CLASS)
+gaz$STATE_ALPHA <- parse_character(gaz$STATE_ALPHA)
+gaz$COUNTY_NAME <- parse_character(gaz$COUNTY_NAME)
+gaz$MAP_NAME <- parse_character(gaz$MAP_NAME)
+#
+# [2] Changing factor vector to data
+gaz$DATE_CREATED <- parse_date(gaz$DATE_CREATED, "%m/%d/%Y")
+gaz$DATE_EDITED <- parse_date(gaz$DATE_EDITED, "%m/%d/%Y")
+gaz
+
+# Although the missing values were taken care of during import data, the Prinary Latitude and Primary Longitude have some unknown data and they are represented as 0. So Removing rows that correspond to 0 in these two column and only considering data for California.
+
+gazCA <- filter(gaz, gaz$STATE_ALPHA == "CA") 
+gazCA <- filter(gazCA,gazCA$PRIM_LAT_DEC != 0 | gazCA$PRIM_LONG_DEC != 0)
+gazCA
+
+# Write the gaz tiblle back to a csv with "|" delimiter
+
+write.table(gazCA,"~/Anurooba/UCSB/BREN/3 Spring 2017/262/Assignment/Assignment 2/gazCA.csv",sep="|")
+
+############# Data Import and The Tibble Art of Tidying Over #############
+```
+
+
+```{r California Gazetteer, eval=TRUE, echo=TRUE, warning=FALSE}
+############# Analyse Data #############
+
+# To find the most frequently occuring Feature Name
+# either use the following code
+# tail(names(sort(table(gazCA$FEATURE_NAME))), 1)
+# Or use the following code, give the count as well.
+sort(table(gazCA$FEATURE_NAME), decreasing=TRUE)[1]
+
+# To find the least frequently occuring Feature Class
+# either use the following code
+# head(names(sort(table(gazCA$FEATURE_CLASS))), 1)
+# Or \use the following code, give the count as well.
+sort(table(gazCA$FEATURE_CLASS), decreasing=FALSE)[1]
+
+
+# To find the appr center point or center coordinates of each county 
+# (Center point/coordinates of the bounding bod of the county;s point feature)
+# find the maximum and minimum point for axes each county and then find the mid point for the axes
+
+# group the CA data by county name
+gazCAByCounty<-group_by(gazCA, COUNTY_NAME)
+gazCAByCounty
+
+# Find the man and min Latitude & Longitude
+gazCAByCounty1 <- summarise(gazCAByCounty, ymin=min(PRIM_LAT_DEC,na.rm=TRUE), ymax=max(PRIM_LAT_DEC,na.rm=TRUE), xmin=min(PRIM_LONG_DEC,na.rm=TRUE),xmax=max(PRIM_LONG_DEC,na.rm=TRUE))
+
+
+# Find the center coordinates for the latitude and longitude for each county in CA
+gazCAByCounty1$CenterLat<-(gazCAByCounty1$ymax+gazCAByCounty1$ymin)/2
+gazCAByCounty1$CenterLong<-(gazCAByCounty1$xmax+gazCAByCounty1$xmin)/2
+gazCAByCounty1
+
+# to find the fractions of total number of features in each county that are natural or man made.
+
+# Using the geonames.usgs.gov, get the FEature Class Definition and the corresponding type -> natural or manmade for the data. Store it localluyand then import into R
+FeatureClassType <- read_csv("~/Anurooba/UCSB/BREN/3 Spring 2017/262/Assignment/Assignment 2/FeatureClassType.csv")
+
+Naturalfraction <- as_tibble(FeatureClassType)
+Naturalfraction
+
+gazCAfrac <- group_by(gazCA, COUNTY_NAME)
+gazCAFeatureFrac <- summarise(gazCAfrac,Naturalfraction = nrow(subset(gazCAfrac, Naturalfraction$Characteristic == "Natural"))/nrow(gazCAfrac),
+                       Manmadefraction = nrow(subset(gazCAfrac, Naturalfraction$Characteristic == "Manmade"))/nrow(gazCAfrac)) 
+gazCAFeatureFrac
+
+
+
+######### Analyse Data Over ############
+```
